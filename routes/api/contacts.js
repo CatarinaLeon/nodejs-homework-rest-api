@@ -1,25 +1,79 @@
 const express = require('express')
-
 const router = express.Router()
+const { NotFound, BadRequest } = require("http-errors");
+const Joi = require("joi")
+
+const contactsOperation = require("../../models/contacts");
+
+const joiShema = Joi.object({
+  name: Joi.string().required(),
+  email: Joi.string().required(),
+  phone: Joi.string().required(),
+})
 
 router.get('/', async (req, res, next) => {
-  res.json({ message: 'template message' })
+  try {
+    const contacts = await contactsOperation.listContacts();
+    res.json(contacts)
+  } catch (error) {
+    next(error)
+  }
 })
 
 router.get('/:contactId', async (req, res, next) => {
-  res.json({ message: 'template message' })
+  try {
+    const { contactId } = req.params;
+    const contact = await contactsOperation.getContactById(contactId);
+    if (!contact) {
+      throw new NotFound();
+    }
+    res.json(contact)
+  } catch (error) {
+    next(error)
+  }
 })
 
 router.post('/', async (req, res, next) => {
-  res.json({ message: 'template message' })
+  try {
+    const { error } = joiShema.validate(req.body);
+    if (error) {
+      throw new BadRequest("missing required name field");
+    }
+    const newContact = await contactsOperation.addContact(req.body);
+    res.status(201).json(newContact);
+  } catch (error) {
+    next(error)
+  }
 })
 
 router.delete('/:contactId', async (req, res, next) => {
-  res.json({ message: 'template message' })
+  try {
+    const { contactId } = req.params;
+    const deleteContact = await contactsOperation.removeContact(contactId);
+    if (!deleteContact) {
+      throw new NotFound();
+    }
+    res.json("message: contact deleted");
+  } catch (error) {
+    next(error)
+  }
 })
 
 router.put('/:contactId', async (req, res, next) => {
-  res.json({ message: 'template message' })
+  try {
+    const { error } = joiShema.validate(req.body);
+    if (error) {
+      throw new BadRequest("message: missing fields");
+    }
+    const { contactId } = req.params;
+    const updatrContact = await contactsOperation.updateContact(
+      contactId,
+      req.body
+    );
+    res.json(updatrContact);
+  } catch (error) {
+    next(error)
+  }
 })
 
 module.exports = router
