@@ -1,19 +1,20 @@
 const express = require('express')
 const router = express.Router()
 const { NotFound, BadRequest } = require("http-errors");
-const Joi = require("joi")
+// const Joi = require("joi")
 
-const contactsOperation = require("../../models/contacts");
+const {Contact, joiShema} = require("../../models/contacts");
+// const contactsOperation = require("../../models/contacts");
 
-const joiShema = Joi.object({
-  name: Joi.string().required(),
-  email: Joi.string().required(),
-  phone: Joi.string().required(),
-})
+// const joiShema = Joi.object({
+//   name: Joi.string().required(),
+//   email: Joi.string().required(),
+//   phone: Joi.string().required(),
+// })
 
 router.get('/', async (req, res, next) => {
   try {
-    const contacts = await contactsOperation.listContacts();
+    const contacts = await Contact.find();
     res.json(contacts)
   } catch (error) {
     next(error)
@@ -23,7 +24,7 @@ router.get('/', async (req, res, next) => {
 router.get('/:contactId', async (req, res, next) => {
   try {
     const { contactId } = req.params;
-    const contact = await contactsOperation.getContactById(contactId);
+    const contact = await Contact.findById(contactId);
     if (!contact) {
       throw new NotFound();
     }
@@ -39,7 +40,7 @@ router.post('/', async (req, res, next) => {
     if (error) {
       throw new BadRequest("missing required name field");
     }
-    const newContact = await contactsOperation.addContact(req.body);
+    const newContact = await Contact.create(req.body);
     res.status(201).json(newContact);
   } catch (error) {
     next(error)
@@ -49,7 +50,7 @@ router.post('/', async (req, res, next) => {
 router.delete('/:contactId', async (req, res, next) => {
   try {
     const { contactId } = req.params;
-    const deleteContact = await contactsOperation.removeContact(contactId);
+    const deleteContact = await Contact.findByIdAndRemove(contactId);
     if (!deleteContact) {
       throw new NotFound();
     }
@@ -61,19 +62,38 @@ router.delete('/:contactId', async (req, res, next) => {
 
 router.put('/:contactId', async (req, res, next) => {
   try {
-    const { error } = joiShema.validate(req.body);
-    if (error) {
-      throw new BadRequest("message: missing fields");
-    }
+    // const { error } = joiShema.validate(req.body);
+    // if (error) {
+    //   throw new BadRequest("message: missing fields");
+    // }
     const { contactId } = req.params;
-    const updatrContact = await contactsOperation.updateContact(
+    const updatrContact = await Contact.findByIdAndUpdate(
       contactId,
-      req.body
+      req.body, 
+      {
+        new: true,
+      }
     );
     res.json(updatrContact);
   } catch (error) {
     next(error)
   }
 })
+
+router.patch('/:contactId/favorite', async (req, res, next) => {
+  try {
+    const { contactId } = req.params;
+    const { favorite = false } = req.body;
+    const updatrContact = await Contact.findByIdAndUpdate(
+      contactId,
+      { favorite },
+      {new: true}
+    );
+    res.json(updatrContact);
+  } catch (error) {
+    next(error)
+  }
+})
+
 
 module.exports = router
