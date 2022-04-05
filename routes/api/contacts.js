@@ -1,18 +1,12 @@
 const express = require('express')
 const router = express.Router()
 const { NotFound, BadRequest } = require("http-errors");
-// const Joi = require("joi")
 
-const {Contact, joiShema} = require("../../models/contacts");
-// const contactsOperation = require("../../models/contacts");
+const { Contact, joiShema } = require("../../models/contacts");
+const {authenticate} = require("../../middlewares")
 
-// const joiShema = Joi.object({
-//   name: Joi.string().required(),
-//   email: Joi.string().required(),
-//   phone: Joi.string().required(),
-// })
 
-router.get('/', async (req, res, next) => {
+router.get('/', authenticate, async (req, res, next) => {
   try {
     const contacts = await Contact.find();
     res.json(contacts)
@@ -21,7 +15,7 @@ router.get('/', async (req, res, next) => {
   }
 })
 
-router.get('/:contactId', async (req, res, next) => {
+router.get('/:contactId', authenticate, async (req, res, next) => {
   try {
     const { contactId } = req.params;
     const contact = await Contact.findById(contactId);
@@ -34,7 +28,7 @@ router.get('/:contactId', async (req, res, next) => {
   }
 })
 
-router.post('/', async (req, res, next) => {
+router.post('/', authenticate, async (req, res, next) => {
   try {
     const { error } = joiShema.validate(req.body);
     if (error) {
@@ -47,7 +41,7 @@ router.post('/', async (req, res, next) => {
   }
 })
 
-router.delete('/:contactId', async (req, res, next) => {
+router.delete('/:contactId', authenticate, async (req, res, next) => {
   try {
     const { contactId } = req.params;
     const deleteContact = await Contact.findByIdAndRemove(contactId);
@@ -60,36 +54,32 @@ router.delete('/:contactId', async (req, res, next) => {
   }
 })
 
-router.put('/:contactId', async (req, res, next) => {
+router.put('/:contactId', authenticate, async (req, res, next) => {
   try {
-    // const { error } = joiShema.validate(req.body);
-    // if (error) {
-    //   throw new BadRequest("message: missing fields");
-    // }
     const { contactId } = req.params;
-    const updatrContact = await Contact.findByIdAndUpdate(
+    const updateContact = await Contact.findByIdAndUpdate(
       contactId,
       req.body, 
       {
         new: true,
       }
     );
-    res.json(updatrContact);
+    res.json(updateContact);
   } catch (error) {
     next(error)
   }
 })
 
-router.patch('/:contactId/favorite', async (req, res, next) => {
+router.patch('/:contactId/favorite', authenticate, async (req, res, next) => {
   try {
     const { contactId } = req.params;
     const { favorite = false } = req.body;
-    const updatrContact = await Contact.findByIdAndUpdate(
+    const updateContact = await Contact.findByIdAndUpdate(
       contactId,
       { favorite },
       {new: true}
     );
-    res.json(updatrContact);
+    res.json(updateContact);
   } catch (error) {
     next(error)
   }
