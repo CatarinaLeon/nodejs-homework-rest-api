@@ -2,11 +2,18 @@ const express = require("express")
 const {Conflict, BadRequest, Unauthorized } = require("http-errors")
 const bcrypt = require("bcryptjs")
 const jwt = require("jsonwebtoken")
+const gravatar = require("gravatar");
+const path = require("path");
+const fs = require("fs/promises");
+const Jimp = require("jimp");
+
 const {joiRegisterSchema, joiLoginShema, joiUpdateSchema, User} = require("../../models/users")
-const { authenticate} = require("../../middlewares")
+const { authenticate, upload} = require("../../middlewares")
 
 const router = express.Router()
 const { SECRET_KEY } = process.env;
+
+const avatarsDir = path.join(__dirname, "../../", "public", "avatars");
 
 router.post("/signup", async (req, res, next) => {
     try {
@@ -19,9 +26,10 @@ router.post("/signup", async (req, res, next) => {
         if (user) {
             throw new Conflict('Email in use')
         }
+        const avatarURL = gravatar.url(email);
         const salt = await bcrypt.genSalt(10)
         const hashPassword = await bcrypt.hash(password, salt)
-        const newUser = await User.create({ email, subscription, password: hashPassword, })
+        const newUser = await User.create({ email, subscription, password: hashPassword, avatarURL,})
         res.status(201).json({
             user: { email: newUser.email, subscription: newUser.subscription }
         });
@@ -94,5 +102,22 @@ router.patch("/", authenticate, async (req, res, next) => {
         next(error)
     }
 });
+
+router.patch("/avatars", authenticate, upload.single("avatar"), async (req, res) => {
+        const { path: tempUpload, filename } = req.file;
+
+        const image = await Jimp.read(tempUpload);
+        await image.resize(250, 250);
+        await image.writeAsync(tempUpload);
+
+        const [extension] = filename.split(".").reverse();
+        const newFileName = `${req.user._id}.${extension}`;
+        const fileUpload = path.join(avatarsDir, newFileName);
+        await fs.rename(tempUpload, fileUpload);
+        const avatarURL = path.join("avatars", newFileName);
+        await User.findByIdAndUpdate(req.user._id, { avatarURL }, { new: true });
+        res.json({ avatarURL });
+    }
+);
 
 module.exports = router;
