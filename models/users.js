@@ -20,6 +20,21 @@ password: {
   token: {
     type: String,
     default: null,
+
+        },
+  owner: {
+      type: Schema.Types.ObjectId,
+      ref: 'user',
+    },
+   verify: {
+      type: Boolean,
+      default: false,
+    },
+    verificationToken: {
+      type: String,
+      required: [true, "Verify token is required"],
+    },
+    }
     },
   avatarURL: {
       type: String,
