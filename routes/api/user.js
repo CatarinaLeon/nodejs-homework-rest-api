@@ -1,12 +1,16 @@
 const express = require("express")
-const {Conflict, BadRequest, Unauthorized } = require("http-errors")
+const {NotFound, Conflict, BadRequest, Unauthorized } = require("http-errors")
 const bcrypt = require("bcryptjs")
 const jwt = require("jsonwebtoken")
+const { v4: uuidv4 } = require("uuid");
+
 const {joiRegisterSchema, joiLoginShema, joiUpdateSchema, User} = require("../../models/users")
 const { authenticate} = require("../../middlewares")
 
+const sendEmail = require("../../helpers/sendEmail");
+
 const router = express.Router()
-const { SECRET_KEY } = process.env;
+const { SECRET_KEY, SITE_NAME } = process.env;
 
 router.post("/signup", async (req, res, next) => {
     try {
@@ -21,7 +25,16 @@ router.post("/signup", async (req, res, next) => {
         }
         const salt = await bcrypt.genSalt(10)
         const hashPassword = await bcrypt.hash(password, salt)
-        const newUser = await User.create({ email, subscription, password: hashPassword, })
+        const verificationToken = uuidv4();
+        const newUser = await User.create({ email, subscription, password: hashPassword, verificationToken})
+
+        const data = {
+            to: email,
+            subject: "Подтверждение email",
+            text: `<a target="_blank" href="${SITE_NAME}/user/verify/${verificationToken}">Подтвердить email</a>`,
+            html: `<a target="_blank" href="${SITE_NAME}/user/verify/${verificationToken}">Подтвердить email</a>`,
+        };
+        await sendEmail(data);
         res.status(201).json({
             user: { email: newUser.email, subscription: newUser.subscription }
         });
@@ -41,6 +54,9 @@ router.post("/login", async (req, res, next) => {
         if (!user) {
             throw new Unauthorized("Email or password is wrong")
         }
+        if (!user.verify) {
+        throw new Unauthorized("Email not verify");
+    }
         const passwordCompare = await bcrypt.compare(password, user.password)
         if (!passwordCompare) {
             throw new Unauthorized("Email or password is wrong");
@@ -92,6 +108,53 @@ router.patch("/", authenticate, async (req, res, next) => {
         res.json(updateContact)
     } catch (error) {
         next(error)
+    }
+});
+
+router.get("/verify/:verificationToken", async (req, res, next) => {
+try {
+    const { verificationToken } = req.params;
+    const user = await User.findOne({ verificationToken });
+    if (!user) {
+        throw new NotFound("User not found");
+    }
+    await User.findOneAndUpdate(user._id, {
+        verificationToken: null,
+        verify: true,
+    });
+    res.json({
+        message: "Verification successful",
+    });
+    } catch (error) {
+    next(error);
+    }
+});
+
+router.post("/verify", async (req, res, next) => {
+try {
+    const { email } = req.body;
+    if (!email) {
+        throw new BadRequest("missing required field email");
+    }
+    const user = User.findOne({ email });
+    if (!user) {
+        throw new NotFound("User not found");
+    }
+    if (user.verify) {
+        throw new BadRequest("Verification has already been passed");
+    }
+    const { verificationToken } = user;
+    const data = {
+        to: email,
+        subject: "Подтверждение email",
+        text: `<a target="_blank" href="${SITE_NAME}/user/verify/${verificationToken}">Подтвердить email</a>`,
+        html: `<a target="_blank" href="${SITE_NAME}/user/verify/${verificationToken}">Подтвердить email</a>`,
+    };
+
+    await sendEmail(data);
+    res.json({ message: "Verification email sent" });
+    } catch (error) {
+    next(error);
     }
 });
 
