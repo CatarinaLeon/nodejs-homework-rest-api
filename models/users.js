@@ -20,6 +20,7 @@ password: {
   token: {
     type: String,
     default: null,
+
         },
   owner: {
       type: Schema.Types.ObjectId,
@@ -34,6 +35,12 @@ password: {
       required: [true, "Verify token is required"],
     },
     }
+    },
+  avatarURL: {
+      type: String,
+      default: "",
+    },
+  },
 )
 
 const joiRegisterSchema = Joi.object({

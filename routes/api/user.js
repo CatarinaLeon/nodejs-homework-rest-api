@@ -3,14 +3,20 @@ const {NotFound, Conflict, BadRequest, Unauthorized } = require("http-errors")
 const bcrypt = require("bcryptjs")
 const jwt = require("jsonwebtoken")
 const { v4: uuidv4 } = require("uuid");
+const gravatar = require("gravatar");
+const path = require("path");
+const fs = require("fs/promises");
+const Jimp = require("jimp");
 
 const {joiRegisterSchema, joiLoginShema, joiUpdateSchema, User} = require("../../models/users")
-const { authenticate} = require("../../middlewares")
+const { authenticate, upload} = require("../../middlewares")
 
 const sendEmail = require("../../helpers/sendEmail");
 
 const router = express.Router()
 const { SECRET_KEY, SITE_NAME } = process.env;
+
+const avatarsDir = path.join(__dirname, "../../", "public", "avatars");
 
 router.post("/signup", async (req, res, next) => {
     try {
@@ -23,10 +29,11 @@ router.post("/signup", async (req, res, next) => {
         if (user) {
             throw new Conflict('Email in use')
         }
+        const avatarURL = gravatar.url(email);
         const salt = await bcrypt.genSalt(10)
         const hashPassword = await bcrypt.hash(password, salt)
         const verificationToken = uuidv4();
-        const newUser = await User.create({ email, subscription, password: hashPassword, verificationToken})
+        const newUser = await User.create({ email, subscription, password: hashPassword, avatarURL, verificationToken})
 
         const data = {
             to: email,
@@ -157,5 +164,22 @@ try {
     next(error);
     }
 });
+
+router.patch("/avatars", authenticate, upload.single("avatar"), async (req, res) => {
+        const { path: tempUpload, filename } = req.file;
+
+        const image = await Jimp.read(tempUpload);
+        await image.resize(250, 250);
+        await image.writeAsync(tempUpload);
+
+        const [extension] = filename.split(".").reverse();
+        const newFileName = `${req.user._id}.${extension}`;
+        const fileUpload = path.join(avatarsDir, newFileName);
+        await fs.rename(tempUpload, fileUpload);
+        const avatarURL = path.join("avatars", newFileName);
+        await User.findByIdAndUpdate(req.user._id, { avatarURL }, { new: true });
+        res.json({ avatarURL });
+    }
+);
 
 module.exports = router;
