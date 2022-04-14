@@ -33,7 +33,7 @@ router.post("/signup", async (req, res, next) => {
         const salt = await bcrypt.genSalt(10)
         const hashPassword = await bcrypt.hash(password, salt)
         const verificationToken = uuidv4();
-        const newUser = await User.create({ email, subscription, password: hashPassword, avatarURL, verificationToken})
+        const newUser = await User.create({ email, subscription, password: hashPassword, avatarURL, verificationToken })
 
         const data = {
             to: email,
